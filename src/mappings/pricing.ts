@@ -4,12 +4,12 @@ import { BigDecimal, Address, BigInt } from '@graphprotocol/graph-ts/index'
 import { ZERO_BD, factoryContract, ADDRESS_ZERO, ONE_BD, UNTRACKED_PAIRS } from './helpers'
 
 const WETH_ADDRESS = '0x4200000000000000000000000000000000000006'
-// const WETH_AXLUSDC_PAIR = '0x9A0b05F3cF748A114A4f8351802b3BFfE07100D4'
+const WETH_AXLUSDC_PAIR = '0x9a0b05f3cf748a114a4f8351802b3bffe07100d4'
 
 export function getEthPriceInUSD(): BigDecimal {
-  let pairAddress = factoryContract.getPair(Address.fromString('0x4200000000000000000000000000000000000006'), Address.fromString('0xEB466342C4d449BC9f53A865D5Cb90586f405215'))
-  // let axlUsdcPair = Pair.load(WETH_AXLUSDC_PAIR) // axlusdc is token1
-  let axlUsdcPair = Pair.load(pairAddress.toHexString()) // axlusdc is token1
+  let axlUsdcPair = Pair.load(WETH_AXLUSDC_PAIR) // axlusdc is token1
+  // let pairAddress = factoryContract.getPair(Address.fromString('0x4200000000000000000000000000000000000006'), Address.fromString('0xeb466342c4d449bc9f53a865d5cb90586f405215'))
+  // let axlUsdcPair = Pair.load(pairAddress.toHexString()) // axlusdc is token1
 
   if (axlUsdcPair !== null) {
     return axlUsdcPair.token1Price
@@ -21,14 +21,14 @@ export function getEthPriceInUSD(): BigDecimal {
 // token where amounts should contribute to tracked volume and liquidity
 let WHITELIST: string[] = [
   '0x4200000000000000000000000000000000000006', // WETH
-  '0x78a087d713Be963Bf307b18F2Ff8122EF9A63ae9', // BSWAP
-  '0xAB8a1c03b8E4e1D21c8Ddd6eDf9e07f26E843492', // OGRE
-  '0xEB466342C4d449BC9f53A865D5Cb90586f405215', // axlUSDC
-  '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', // DAI
-  '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA', // USDbC
-  '0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22', // cbETH
-  '0x276Ad7898945AD00548E234f731000C7562e2E42', // BSC
-  '0xA0F3cCA33B2f2872e90BBF5D79B078f2B512775F', // COINBASE
+  '0x78a087d713be963bf307b18f2ff8122ef9a63ae9', // BSWAP
+  '0xab8a1c03b8e4e1d21c8ddd6edf9e07f26e843492', // OGRE
+  '0xeb466342c4d449bc9f53a865d5cb90586f405215', // axlUSDC
+  '0x50c5725949a6f0c72e6c4a641f24049a917db0cb', // DAI
+  '0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca', // USDbC
+  '0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22', // cbETH
+  '0x276ad7898945ad00548e234f731000c7562e2e42', // BSC
+  '0xa0f3cca33b2f2872e90bbf5d79b078f2b512775f', // COINBASE
 ]
 
 // minimum liquidity required to count towards tracked volume for pairs with small # of Lps
