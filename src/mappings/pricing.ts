@@ -25,10 +25,9 @@ let WHITELIST: string[] = [
   '0xab8a1c03b8e4e1d21c8ddd6edf9e07f26e843492', // OGRE
   '0xeb466342c4d449bc9f53a865d5cb90586f405215', // axlUSDC
   '0x50c5725949a6f0c72e6c4a641f24049a917db0cb', // DAI
+  '0x4a3a6dd60a34bb2aba60d73b4c88315e9ceb6a3d', // MIM
   '0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca', // USDbC
   '0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22', // cbETH
-  '0x276ad7898945ad00548e234f731000c7562e2e42', // BSC
-  '0xa0f3cca33b2f2872e90bbf5d79b078f2b512775f', // COINBASE
 ]
 
 // minimum liquidity required to count towards tracked volume for pairs with small # of Lps
