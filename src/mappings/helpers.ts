@@ -1,14 +1,15 @@
 /* eslint-disable prefer-const */
-import { log, BigInt, BigDecimal, Address, ethereum } from '@graphprotocol/graph-ts'
+import { log, BigInt, BigDecimal, Address, ethereum, Bytes, ByteArray } from '@graphprotocol/graph-ts'
 import { ERC20 } from '../types/Factory/ERC20'
 import { ERC20SymbolBytes } from '../types/Factory/ERC20SymbolBytes'
 import { ERC20NameBytes } from '../types/Factory/ERC20NameBytes'
-import { User, Bundle, Token, LiquidityPosition, LiquidityPositionSnapshot, Pair } from '../types/schema'
+import { User, Bundle, Token, LiquidityPosition, LiquidityPositionSnapshot, Pair, UniswapFactory } from '../types/schema'
 import { Factory as FactoryContract } from '../types/templates/Pair/Factory'
 import { TokenDefinition } from './tokenDefinition'
 
-export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000'
-export const FACTORY_ADDRESS = '0xfda619b6d20975be80a10332cd39b9a4b0faa8bb'
+export const ADDRESS_ZERO = Bytes.fromHexString('0x0000000000000000000000000000000000000000')
+export const FACTORY_ADDRESS = Address.fromString('0xfda619b6d20975be80a10332cd39b9a4b0faa8bb')
+export const BUNDLE_ID = Bytes.fromByteArray(ByteArray.fromI32(1))
 
 export let ZERO_BI = BigInt.fromI32(0)
 export let ONE_BI = BigInt.fromI32(1)
@@ -16,10 +17,11 @@ export let ZERO_BD = BigDecimal.fromString('0')
 export let ONE_BD = BigDecimal.fromString('1')
 export let BI_18 = BigInt.fromI32(18)
 
-export let factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS))
+export let factoryContract = FactoryContract.bind(FACTORY_ADDRESS)
 
-// rebass tokens, dont count in tracked volume
-export let UNTRACKED_PAIRS: string[] = []
+// rebase tokens, dont count in tracked volume
+// export let UNTRACKED_PAIRS: Bytes[] = [].map<Bytes>(addr => Bytes.fromHexString(addr))
+export let UNTRACKED_PAIRS: Bytes[] = []
 
 export function exponentToBigDecimal(decimals: BigInt): BigDecimal {
   let bd = BigDecimal.fromString('1')
@@ -34,7 +36,7 @@ export function bigDecimalExp18(): BigDecimal {
 }
 
 export function convertEthToDecimal(eth: BigInt): BigDecimal {
-  return eth.toBigDecimal().div(exponentToBigDecimal(18))
+  return eth.toBigDecimal().div(exponentToBigDecimal(BI_18))
 }
 
 export function convertTokenToDecimal(tokenAmount: BigInt, exchangeDecimals: BigInt): BigDecimal {
@@ -60,7 +62,7 @@ export function isNullEthValue(value: string): boolean {
 export function fetchTokenSymbol(tokenAddress: Address): string {
   // static definitions overrides
   let staticDefinition = TokenDefinition.fromAddress(tokenAddress)
-  if(staticDefinition != null) {
+  if (staticDefinition != null) {
     return (staticDefinition as TokenDefinition).symbol
   }
 
@@ -88,7 +90,7 @@ export function fetchTokenSymbol(tokenAddress: Address): string {
 export function fetchTokenName(tokenAddress: Address): string {
   // static definitions overrides
   let staticDefinition = TokenDefinition.fromAddress(tokenAddress)
-  if(staticDefinition != null) {
+  if (staticDefinition != null) {
     return (staticDefinition as TokenDefinition).name
   }
 
@@ -118,50 +120,48 @@ export function fetchTokenTotalSupply(tokenAddress: Address): BigInt {
   let totalSupplyResult = contract.try_totalSupply()
   if (!totalSupplyResult.reverted) {
     return totalSupplyResult.value
+  } else {
+    return ZERO_BI
   }
-  return BigInt.fromI32(0)
 }
 
-export function fetchTokenDecimals(tokenAddress: Address): BigInt {
+export function fetchTokenDecimals(tokenAddress: Address): BigInt | null {
   // static definitions overrides
   let staticDefinition = TokenDefinition.fromAddress(tokenAddress)
-  if(staticDefinition != null) {
+  if (staticDefinition != null) {
     return (staticDefinition as TokenDefinition).decimals
   }
 
   let contract = ERC20.bind(tokenAddress)
-  // try types uint8 for decimals
   let decimalResult = contract.try_decimals()
   if (!decimalResult.reverted) {
     return BigInt.fromI32(decimalResult.value)
+  } else {
+    return null
   }
-  return BigInt.fromI32(0)
 }
 
 export function createLiquidityPosition(exchange: Address, user: Address): LiquidityPosition {
-  let id = exchange
-    .toHexString()
-    .concat('-')
-    .concat(user.toHexString())
+  let id = exchange.concat(user)
   let liquidityTokenBalance = LiquidityPosition.load(id)
   if (liquidityTokenBalance === null) {
-    let pair = Pair.load(exchange.toHexString())
-    pair!.liquidityProviderCount = pair!.liquidityProviderCount.plus(ONE_BI)
+    let pair = Pair.load(exchange)!
+    pair.liquidityProviderCount = pair.liquidityProviderCount.plus(ONE_BI)
     liquidityTokenBalance = new LiquidityPosition(id)
     liquidityTokenBalance.liquidityTokenBalance = ZERO_BD
-    liquidityTokenBalance.pair = exchange.toHexString()
-    liquidityTokenBalance.user = user.toHexString()
+    liquidityTokenBalance.pair = exchange
+    liquidityTokenBalance.user = user
     liquidityTokenBalance.save()
-    pair!.save()
+    pair.save()
   }
-  if (liquidityTokenBalance === null) log.error('LiquidityTokenBalance is null', [id])
+  if (liquidityTokenBalance === null) log.error('LiquidityTokenBalance is null', [id.toHexString()])
   return liquidityTokenBalance as LiquidityPosition
 }
 
 export function createUser(address: Address): void {
-  let user = User.load(address.toHexString())
+  let user = User.load(address)
   if (user === null) {
-    user = new User(address.toHexString())
+    user = new User(address)
     user.usdSwapped = ZERO_BD
     user.save()
   }
@@ -169,26 +169,82 @@ export function createUser(address: Address): void {
 
 export function createLiquiditySnapshot(position: LiquidityPosition, event: ethereum.Event): void {
   let timestamp = event.block.timestamp.toI32()
-  let bundle = Bundle.load('1')
-  let pair = Pair.load(position.pair)
-  let token0 = Token.load(pair!.token0)
-  let token1 = Token.load(pair!.token1)
+  let bundle = loadBundle()
+  let pair = Pair.load(position.pair)!
+  let token0 = Token.load(pair.token0)!
+  let token1 = Token.load(pair.token1)!
 
   // create new snapshot
-  let snapshot = new LiquidityPositionSnapshot(position.id.concat(timestamp.toString()))
+  let snapshot = new LiquidityPositionSnapshot(position.id.concatI32(timestamp))
   snapshot.liquidityPosition = position.id
   snapshot.timestamp = timestamp
   snapshot.block = event.block.number.toI32()
   snapshot.user = position.user
   snapshot.pair = position.pair
-  snapshot.token0PriceUSD = token0!.derivedETH!.times(bundle!.ethPrice)
-  snapshot.token1PriceUSD = token1!.derivedETH!.times(bundle!.ethPrice)
-  snapshot.reserve0 = pair!.reserve0
-  snapshot.reserve1 = pair!.reserve1
-  snapshot.reserveUSD = pair!.reserveUSD
-  snapshot.liquidityTokenTotalSupply = pair!.totalSupply
+  snapshot.token0PriceUSD = usdPrice(token0, bundle)
+  snapshot.token1PriceUSD = usdPrice(token1, bundle)
+  snapshot.reserve0 = pair.reserve0
+  snapshot.reserve1 = pair.reserve1
+  snapshot.reserveUSD = pair.reserveUSD
+  snapshot.liquidityTokenTotalSupply = pair.totalSupply
   snapshot.liquidityTokenBalance = position.liquidityTokenBalance
   snapshot.liquidityPosition = position.id
   snapshot.save()
   position.save()
+}
+
+export function loadFactory(): UniswapFactory {
+  let factory = UniswapFactory.load(FACTORY_ADDRESS)
+  if (factory === null) {
+    throw new Error("Could not find UniswapFactory")
+  }
+  return factory
+}
+
+export function loadBundle(): Bundle {
+  return Bundle.load(BUNDLE_ID)!
+}
+
+export function usdPrice(token: Token, bundle: Bundle): BigDecimal {
+  let derivedETH = token.derivedETH
+  if (derivedETH === null) {
+    throw new Error(`derivedETH not set for token ${token.id}`)
+  } else {
+    return derivedETH.times(bundle.ethPrice)
+  }
+}
+
+export function ethAmount(amount: BigDecimal, token: Token): BigDecimal {
+  let derivedETH = token.derivedETH
+  if (derivedETH === null) {
+    throw new Error(`derivedETH not set for token ${token.id}`)
+  } else {
+    return derivedETH.times(amount)
+  }
+}
+
+/// Return -1 if id0 < id1, 0 if they are equal and 1 if id0 > id1
+function compare(id0: Bytes, id1: Bytes): i32 {
+  for (let i = 0; i < id0.length && i < id1.length; i++) {
+    if (id0[i] < id1[i]) {
+      return -1
+    } else if (id0[i] > id1[i]) {
+      return 1
+    }
+  }
+  if (id0.length < id1.length) {
+    return -1
+  } else if (id0.length > id1.length) {
+    return 1
+  } else {
+    return 0
+  }
+}
+
+export function pairLookupID(id0: Bytes, id1: Bytes): Bytes {
+  if (compare(id0, id1) < 0) {
+    return id0.concat(id1)
+  } else {
+    return id1.concat(id0)
+  }
 }
