@@ -8,7 +8,7 @@ import { Factory as FactoryContract } from '../types/templates/Pair/Factory'
 import { TokenDefinition } from './tokenDefinition'
 
 export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000'
-export const FACTORY_ADDRESS = '0xFDa619b6d20975be80A10332cD39b9a4b0FAa8BB'
+export const FACTORY_ADDRESS = '0xfda619b6d20975be80a10332cd39b9a4b0faa8bb'
 
 export let ZERO_BI = BigInt.fromI32(0)
 export let ONE_BI = BigInt.fromI32(1)
@@ -19,7 +19,7 @@ export let BI_18 = BigInt.fromI32(18)
 export let factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS))
 
 // rebass tokens, dont count in tracked volume
-export let UNTRACKED_PAIRS: string[] = ['']
+export let UNTRACKED_PAIRS: string[] = []
 
 export function exponentToBigDecimal(decimals: BigInt): BigDecimal {
   let bd = BigDecimal.fromString('1')
@@ -115,12 +115,11 @@ export function fetchTokenName(tokenAddress: Address): string {
 
 export function fetchTokenTotalSupply(tokenAddress: Address): BigInt {
   let contract = ERC20.bind(tokenAddress)
-  let totalSupplyValue = NaN
   let totalSupplyResult = contract.try_totalSupply()
   if (!totalSupplyResult.reverted) {
-    totalSupplyValue = changetype<i32>(totalSupplyResult)
+    return totalSupplyResult.value
   }
-  return BigInt.fromI32(totalSupplyValue as i32)
+  return BigInt.fromI32(0)
 }
 
 export function fetchTokenDecimals(tokenAddress: Address): BigInt {
@@ -132,12 +131,11 @@ export function fetchTokenDecimals(tokenAddress: Address): BigInt {
 
   let contract = ERC20.bind(tokenAddress)
   // try types uint8 for decimals
-  let decimalValue = NaN
   let decimalResult = contract.try_decimals()
   if (!decimalResult.reverted) {
-    decimalValue = decimalResult.value
+    return BigInt.fromI32(decimalResult.value)
   }
-  return BigInt.fromI32(decimalValue as i32)
+  return BigInt.fromI32(0)
 }
 
 export function createLiquidityPosition(exchange: Address, user: Address): LiquidityPosition {
